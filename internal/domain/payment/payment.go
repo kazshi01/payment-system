@@ -12,5 +12,5 @@ type Payment struct {
 	OrderID  string
 	Method   Method
 	Provider string // e.g. "stripe"
-	TxID     string
+	TxID     string // プロバイダ側のトランザクションID
 }
