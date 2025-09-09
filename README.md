@@ -1,3 +1,4 @@
+```
 payment-system/
 ├── cmd/                  # エントリポイント（main.goを置く）
 │   └── api/
@@ -21,3 +22,4 @@ payment-system/
 ├── pkg/                  # 再利用可能なライブラリ（認証、ロギング等）
 ├── go.mod
 └── go.sum
+```
