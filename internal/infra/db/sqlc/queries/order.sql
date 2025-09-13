@@ -11,3 +11,8 @@ WHERE id = $1;
 UPDATE orders
 SET amount_jpy = $2, status = $3, updated_at = $4
 WHERE id = $1;
+
+-- name: UpdateOrderStatusIfPending :execrows
+UPDATE orders
+SET status = $2, updated_at = $3
+WHERE id = $1 AND status = 'PENDING';

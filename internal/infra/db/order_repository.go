@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/kazshi01/payment-system/internal/domain"
 	"github.com/kazshi01/payment-system/internal/domain/order"
 	sqlcdb "github.com/kazshi01/payment-system/internal/infra/db/sqlc"
 )
@@ -51,7 +53,7 @@ func (r *PostgresOrderRepository) FindByID(ctx context.Context, id order.ID) (*o
 	rec, err := r.getQ(ctx).GetOrder(ctx, string(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("order not found: %w", err)
+			return nil, domain.ErrNotFound
 		}
 		return nil, fmt.Errorf("get order: %w", err)
 	}
@@ -78,4 +80,23 @@ func (r *PostgresOrderRepository) Update(ctx context.Context, o *order.Order) er
 		return fmt.Errorf("update order: %w", err)
 	}
 	return nil
+}
+
+func (r *PostgresOrderRepository) UpdateStatusIfPending(
+	ctx context.Context,
+	id order.ID,
+	newStatus order.Status,
+	updatedAt time.Time,
+) (int64, error) {
+
+	params := sqlcdb.UpdateOrderStatusIfPendingParams{
+		ID:        string(id),
+		Status:    string(newStatus),
+		UpdatedAt: updatedAt,
+	}
+	affected, err := r.getQ(ctx).UpdateOrderStatusIfPending(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("update order status if pending: %w", err)
+	}
+	return affected, nil
 }
