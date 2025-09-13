@@ -1,0 +1,15 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "db/migrations"                   # 既存のマイグレーションを読む
+    queries:
+      - "internal/infra/db/sqlc/queries"  # CRUD用の .sql ファイル置き場
+    gen:
+      go:
+        package: "sqlcdb"
+        out: "internal/infra/db/sqlc"     # 生成コードの出力先
+        sql_package: "database/sql"
+        emit_interface: false
+        emit_empty_slices: true
+        emit_exact_table_names: false
