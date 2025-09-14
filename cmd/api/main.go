@@ -10,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
+	"github.com/kazshi01/payment-system/internal/infra/auth"
 	"github.com/kazshi01/payment-system/internal/infra/clock"
 	"github.com/kazshi01/payment-system/internal/infra/db"
 	"github.com/kazshi01/payment-system/internal/infra/db/pg"
@@ -69,9 +70,19 @@ func main() {
 	// --- Handler ---
 	handler := &httpi.OrderHandler{UC: orderUC}
 
+	// --- Middleware ---
+
+	mw, err := auth.Middleware(auth.Config{
+		Issuer:   os.Getenv("OIDC_ISSUER"),
+		Audience: os.Getenv("OIDC_AUDIENCE"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /orders", handler.Create)
-	mux.HandleFunc("POST /orders/{id}/pay", handler.Pay)
+	mux.Handle("POST /orders", mw(http.HandlerFunc(handler.Create)))
+	mux.Handle("POST /orders/{id}/pay", mw(http.HandlerFunc(handler.Pay)))
 
 	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))

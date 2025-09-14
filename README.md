@@ -1,25 +1,83 @@
+# Payment System
+
+## ディレクトリ構成
+
 ```
 payment-system/
-├── cmd/                  # エントリポイント（main.goを置く）
+├── cmd/
 │   └── api/
 │       └── main.go
-├── internal/             # アプリケーションの内部実装
-│   ├── domain/           # DDD: エンティティ、値オブジェクト、リポジトリ
+├── db/
+│   ├── migrate.sh
+│   ├── migrations/
+│   │   ├── 0001_init.down.sql
+│   │   └── 0001_init.up.sql
+│   └── order_record.go
+│   └── Makefile
+├── internal/
+│   │
+│   ├── domain/
+│   │   ├── errors.go
+│   │   ├── payment_gateway.go
+│   │   ├── repository.go
 │   │   ├── order/
 │   │   │   └── order.go
 │   │   └── payment/
 │   │       └── payment.go
-│   ├── usecase/          # アプリケーションサービス層
+│   │
+│   ├── usecase/
 │   │   └── order_usecase.go
-│   ├── infra/            # DB、外部API、メッセージングなどの実装
-│   │   ├── db/
-│   │   │   └── postgres.go
-│   │   └── payment_gateway/
-│   │       └── stripe_client.go
-│   └── interface/        # プレゼンテーション層（APIハンドラー）
-│       └── http/
-│           └── order_handler.go
-├── pkg/                  # 再利用可能なライブラリ（認証、ロギング等）
-├── go.mod
-└── go.sum
+│   ├── interface/
+│   │   └── httpi/
+│   │       ├── order_handler.go
+│   │       └── respond.go
+│   │
+│   └── infra/
+│       ├── clock/
+│       │   └── system.go
+│       ├── idgen/
+│       │   └── uuidgen.go
+│       └── db/
+│           ├── dbmodel/
+│           │   └── order.go
+│           ├── order_repository.go
+│           ├── tx.go
+│           ├── pg/
+│           │   └── nop.go
+│           └── sqlc/
+│               ├── db.go
+│               ├── models.go
+│               ├── order.sql.go
+│               └── queries/
+│                   └── order.sql
+└── pkg/
+    └── .gitkeep
+```
+
+## API
+
+- Docker Desktop を起動する
+
+- マイグレーションを適用する
+
+```
+make migrate.up
+```
+
+- サーバーを起動する
+
+```
+go run cmd/api/main.go
+```
+
+- 注文を作成する
+
+```
+curl -i -X POST http://localhost:8080/orders -H 'Content-Type: application/json' -d '{"amount_jpy": 1200}'
+```
+
+- 注文を支払う
+
+```
+curl -i -X POST http://localhost:8080/orders/{id}/pay 
 ```
