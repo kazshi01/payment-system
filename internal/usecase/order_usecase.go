@@ -22,13 +22,6 @@ type OrderUsecase struct {
 	IDGen IDGen
 }
 
-func (uc *OrderUsecase) now() time.Time {
-	if uc.Clock != nil {
-		return uc.Clock.Now()
-	}
-	return time.Now()
-}
-
 // --- Create ---
 
 func (uc *OrderUsecase) CreateOrder(ctx context.Context, amountJPY int64) (*order.Order, error) {
@@ -44,8 +37,8 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, amountJPY int64) (*orde
 		ID:        order.ID(uc.IDGen.New()),
 		AmountJPY: amountJPY,
 		Status:    order.StatusPending,
-		CreatedAt: uc.now(),
-		UpdatedAt: uc.now(),
+		CreatedAt: uc.Clock.Now(),
+		UpdatedAt: uc.Clock.Now(),
 	}
 
 	// ---- DB 反映は 3s ----
@@ -83,7 +76,7 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 		OrderID:        string(o.ID),
 		Amount:         o.AmountJPY,
 		Currency:       CurrencyJPY,
-		IdempotencyKey: string(o.ID), // OrderIDをキーにすれば冪等性を保証できる
+		IdempotencyKey: "pay:" + string(o.ID), // 他操作(cancel/refund)は将来別prefixで対応
 	})
 	if err != nil {
 		return err
@@ -110,7 +103,7 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 		// if err := uc.PaymentEventsRepo.Append(dbCtx, ...); err != nil { return err }
 
 		oo.MarkPaid()
-		updatedAt := uc.now()
+		updatedAt := uc.Clock.Now()
 		rows, err := uc.Repo.UpdateStatusIfPending(dbCtx, oo.ID, order.StatusPaid, updatedAt)
 		if err != nil {
 			return err
