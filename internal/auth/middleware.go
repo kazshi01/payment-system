@@ -10,7 +10,7 @@ import (
 
 type Config struct {
 	Issuer   string
-	Audience string // aud 検証に使う（IdPの設定に合わせる）
+	Audience string
 }
 
 func Middleware(cfg Config) (func(http.Handler) http.Handler, error) {
@@ -20,7 +20,7 @@ func Middleware(cfg Config) (func(http.Handler) http.Handler, error) {
 	}
 
 	verifier := provider.Verifier(&oidc.Config{
-		ClientID:          cfg.Audience, // aud 検証
+		ClientID:          cfg.Audience,
 		SkipClientIDCheck: false,
 	})
 

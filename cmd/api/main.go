@@ -10,7 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
-	"github.com/kazshi01/payment-system/internal/infra/auth"
+	"github.com/kazshi01/payment-system/internal/auth"
 	"github.com/kazshi01/payment-system/internal/infra/clock"
 	"github.com/kazshi01/payment-system/internal/infra/db"
 	"github.com/kazshi01/payment-system/internal/infra/db/pg"
