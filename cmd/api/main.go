@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -67,10 +68,16 @@ func main() {
 		IDGen: idgen.UUIDGen{},
 	}
 
-	// --- Handler ---
+	// --- OrderHandler ---
 	handler := &httpi.OrderHandler{UC: orderUC}
 
-	// --- Middleware ---
+	// --- AuthHandler ---
+	authH, err := httpi.NewAuthHandler(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// --- Middleware M2M ---
 
 	mw, err := auth.Middleware(auth.Config{
 		Issuer:   os.Getenv("OIDC_ISSUER"),
@@ -83,6 +90,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("POST /orders", mw(http.HandlerFunc(handler.Create)))
 	mux.Handle("POST /orders/{id}/pay", mw(http.HandlerFunc(handler.Pay)))
+
+	mux.HandleFunc("GET /auth/login", authH.Login)
+	mux.HandleFunc("GET /auth/callback", authH.Callback)
 
 	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
