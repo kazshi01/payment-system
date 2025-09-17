@@ -3,55 +3,62 @@
 ## ディレクトリ構成
 
 ```
-payment-system/
-├── cmd/
-│   └── api/
+├── cmd
+│   └── api
 │       └── main.go
-├── db/
+├── db
 │   ├── migrate.sh
-│   ├── migrations/
+│   ├── migrations
 │   │   ├── 0001_init.down.sql
 │   │   └── 0001_init.up.sql
 │   └── order_record.go
-│   └── Makefile
-├── internal/
-│   │
-│   ├── domain/
+├── docker-compose.yaml
+├── internal
+│   ├── auth
+│   │   ├── middleware.go
+│   │   └── oidc-pkce.go
+│   ├── domain
 │   │   ├── errors.go
-│   │   ├── payment_gateway.go
-│   │   ├── repository.go
-│   │   ├── order/
+│   │   ├── order
 │   │   │   └── order.go
-│   │   └── payment/
-│   │       └── payment.go
-│   │
-│   ├── usecase/
-│   │   └── order_usecase.go
-│   ├── interface/
-│   │   └── httpi/
+│   │   ├── payment
+│   │   │   └── payment.go
+│   │   ├── payment_gateway.go
+│   │   └── repository.go
+│   ├── infra
+│   │   ├── clock
+│   │   │   └── system.go
+│   │   ├── db
+│   │   │   ├── dbmodel
+│   │   │   │   └── order.go
+│   │   │   ├── order_repository.go
+│   │   │   ├── pg
+│   │   │   │   └── nop.go
+│   │   │   ├── sqlc
+│   │   │   │   ├── db.go
+│   │   │   │   ├── models.go
+│   │   │   │   ├── order.sql.go
+│   │   │   │   └── queries
+│   │   │   │       └── order.sql
+│   │   │   └── tx.go
+│   │   └── idgen
+│   │       └── uuidgen.go
+│   ├── interface
+│   │   └── httpi
+│   │       ├── auth_handler.go
 │   │       ├── order_handler.go
 │   │       └── respond.go
-│   │
-│   └── infra/
-│       ├── clock/
-│       │   └── system.go
-│       ├── idgen/
-│       │   └── uuidgen.go
-│       └── db/
-│           ├── dbmodel/
-│           │   └── order.go
-│           ├── order_repository.go
-│           ├── tx.go
-│           ├── pg/
-│           │   └── nop.go
-│           └── sqlc/
-│               ├── db.go
-│               ├── models.go
-│               ├── order.sql.go
-│               └── queries/
-│                   └── order.sql
-└── pkg/
-    └── .gitkeep
+│   └── usecase
+│       └── order_usecase.go
+├── kc-data
+│   └── data
+│       └── h2
+│           ├── keycloakdb.mv.db
+│           └── keycloakdb.trace.db
+├── Makefile
+├── pkg
+├── README.md
+└── sqlc.yaml
 ```
 
 ## API
@@ -64,33 +71,46 @@ payment-system/
 make migrate.up
 ```
 
+- Keycloak を起動する
+
+```
+make keycloak.up
+```
+
 - サーバーを起動する
 
 ```
 go run cmd/api/main.go
 ```
 
+- OIDC認証をするため、ブラウザで下記ログインページにアクセスする
+- ログイン後に表示されるTOKENをコピーする
+
+```
+http://localhost:8080/auth/login
+```
+
 - 注文を作成する
 
 ```
-curl -i -X POST http://localhost:8080/orders -H 'Content-Type: application/json' -d '{"amount_jpy": 1200}'
+TOKEN=<TOKEN>
+
+curl -s -i -X POST http://localhost:8080/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount_jpy":1200}'
 ```
 
 - 注文を支払う
 
 ```
-curl -i -X POST http://localhost:8080/orders/{id}/pay
+curl -i -X POST "http://localhost:8080/orders/{id}/pay" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## 認証あり
 
-```
-docker run -p 8081:8080 \
-  -v "$(pwd)/kc-data/data:/opt/keycloak/data" \
-  -e KEYCLOAK_ADMIN=admin \
-  -e KEYCLOAK_ADMIN_PASSWORD=admin \
-  quay.io/keycloak/keycloak:24.0.5 start-dev
-```
+- Keycloak に管理者ログインして、 payment-api の SECRET を取得する
 
 ```
 # 1) 発行（client_credentials）
@@ -114,4 +134,18 @@ echo "ORDER_ID=$ORDER_ID"
 # 3) 支払い
 curl -i -X POST "http://localhost:8080/orders/$ORDER_ID/pay" \
   -H "Authorization: Bearer $TOKEN"
+```
+
+## 削除
+
+- Keycloak を削除する
+
+```
+make keycloak.down
+```
+
+- DB を削除する
+
+```
+make migrate.down
 ```
