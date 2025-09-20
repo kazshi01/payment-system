@@ -2,7 +2,6 @@ package httpi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
 	"time"
@@ -102,8 +101,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		"id_token":     idTokenRaw,
 		"claims":       claims,
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(resp)
+	WriteJSON(w, http.StatusCreated, resp)
 }
 
 func setTmpCookie(w http.ResponseWriter, name, val string, ttl time.Duration) {
