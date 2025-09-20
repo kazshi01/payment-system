@@ -2,8 +2,11 @@ package httpi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -82,6 +85,23 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rt, _ := tok.Extra("refresh_token").(string)
+	if rt != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "rt",
+			Value:    rt,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   60 * 60, // 1h
+		})
+
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
 	// アクセストークンを検証 & クレームを読む（任意）
 	idTokenRaw, _ := tok.Extra("id_token").(string)
 	verifier := h.OIDC.Provider.Verifier(&oidc.Config{
@@ -113,4 +133,89 @@ func setTmpCookie(w http.ResponseWriter, name, val string, ttl time.Duration) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(ttl.Seconds()),
 	})
+}
+
+// POST /auth/refresh
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	c, err := r.Cookie("rt")
+	if err != nil || c.Value == "" {
+		http.Error(w, "missing refresh token", http.StatusUnauthorized)
+		return
+	}
+
+	ts := h.OIDC.Config.TokenSource(r.Context(), &oauth2.Token{
+		RefreshToken: c.Value,
+	})
+	tok, err := ts.Token()
+	if err != nil {
+		http.Error(w, "refresh failed: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	newRT := tok.RefreshToken
+	if newRT == "" {
+		newRT = c.Value
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rt",
+		Value:    newRT,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		// Secure: true, // 本番は有効
+		MaxAge: 60 * 60,
+	})
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"access_token": tok.AccessToken,
+		"expires_in":   int64(time.Until(tok.Expiry).Seconds()),
+		"token_type":   tok.TokenType,
+	})
+}
+
+// POST /auth/logout
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// ログアウト時には refresh token を渡す
+	c, err := r.Cookie("rt")
+	if err != nil || c.Value == "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	issuer := os.Getenv("OIDC_ISSUER")
+	logoutURL := issuer + "/protocol/openid-connect/logout"
+
+	form := url.Values{}
+	form.Set("client_id", h.OIDC.Config.ClientID)
+	form.Set("refresh_token", c.Value)
+
+	req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, logoutURL, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if resp, err := http.DefaultClient.Do(req); err == nil && resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rt",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		// Secure: true, // 本番は有効
+		MaxAge: 0, // delete
+	})
+	w.WriteHeader(http.StatusNoContent)
 }

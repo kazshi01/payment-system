@@ -136,6 +136,20 @@ curl -i -X POST "http://localhost:8080/orders/$ORDER_ID/pay" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+- アクセストークンを更新する
+
+```
+curl -i -X POST http://localhost:8080/auth/refresh \
+  -H 'Cookie: rt=<ブラウザから rt 取得>'
+```
+
+- ログアウトする
+
+```
+curl -i -X POST http://localhost:8080/auth/logout \
+  -H 'Cookie: rt=<ブラウザから rt 取得>'
+```
+
 ## 削除
 
 - Keycloak を削除する

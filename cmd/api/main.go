@@ -88,11 +88,15 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /", httpi.Home)
+
 	mux.Handle("POST /orders", mw(http.HandlerFunc(handler.Create)))
 	mux.Handle("POST /orders/{id}/pay", mw(http.HandlerFunc(handler.Pay)))
 
 	mux.HandleFunc("GET /auth/login", authH.Login)
 	mux.HandleFunc("GET /auth/callback", authH.Callback)
+	mux.HandleFunc("POST /auth/refresh", authH.Refresh)
+	mux.HandleFunc("POST /auth/logout", authH.Logout)
 
 	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
