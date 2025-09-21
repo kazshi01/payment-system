@@ -37,6 +37,7 @@ func (r *PostgresOrderRepository) getQ(ctx context.Context) *sqlcdb.Queries {
 func (r *PostgresOrderRepository) Create(ctx context.Context, o *order.Order) error {
 	params := sqlcdb.CreateOrderParams{
 		ID:        string(o.ID),
+		UserID:    o.UserID,
 		AmountJpy: o.AmountJPY,
 		Status:    string(o.Status),
 		CreatedAt: o.CreatedAt,
@@ -48,24 +49,26 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, o *order.Order) er
 	return nil
 }
 
-// FindByID fetches an order by ID.
-func (r *PostgresOrderRepository) FindByID(ctx context.Context, id order.ID) (*order.Order, error) {
-	rec, err := r.getQ(ctx).GetOrder(ctx, string(id))
+// FindByIDForUser fetches an order by ID and user ID.
+func (r *PostgresOrderRepository) FindByIDForUser(ctx context.Context, id order.ID, userID string) (*order.Order, error) {
+	rec, err := r.getQ(ctx).GetOrderForUser(ctx, sqlcdb.GetOrderForUserParams{
+		ID:     string(id),
+		UserID: userID,
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, fmt.Errorf("get order: %w", err)
+		return nil, fmt.Errorf("get order for user: %w", err)
 	}
-
-	o := &order.Order{
+	return &order.Order{
 		ID:        order.ID(rec.ID),
+		UserID:    rec.UserID,
 		AmountJPY: rec.AmountJpy,
 		Status:    order.Status(rec.Status),
 		CreatedAt: rec.CreatedAt,
 		UpdatedAt: rec.UpdatedAt,
-	}
-	return o, nil
+	}, nil
 }
 
 // Update updates mutable fields of an order.
@@ -82,21 +85,23 @@ func (r *PostgresOrderRepository) Update(ctx context.Context, o *order.Order) er
 	return nil
 }
 
-func (r *PostgresOrderRepository) UpdateStatusIfPending(
+// UpdateStatusIfPendingForUser updates the status of an order to the given status if it is pending.
+func (r *PostgresOrderRepository) UpdateStatusIfPendingForUser(
 	ctx context.Context,
 	id order.ID,
+	userID string,
 	newStatus order.Status,
 	updatedAt time.Time,
 ) (int64, error) {
-
-	params := sqlcdb.UpdateOrderStatusIfPendingParams{
+	n, err := r.getQ(ctx).UpdateOrderStatusIfPendingForUser(ctx, sqlcdb.UpdateOrderStatusIfPendingForUserParams{
 		ID:        string(id),
+		UserID:    userID,
 		Status:    string(newStatus),
 		UpdatedAt: updatedAt,
-	}
-	affected, err := r.getQ(ctx).UpdateOrderStatusIfPending(ctx, params)
+	})
 	if err != nil {
-		return 0, fmt.Errorf("update order status if pending: %w", err)
+		return 0, fmt.Errorf("update status if pending (user): %w", err)
 	}
-	return affected, nil
+
+	return n, nil
 }

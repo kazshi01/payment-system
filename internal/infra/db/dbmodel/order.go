@@ -9,6 +9,7 @@ import (
 func OrderToDomain(r sqlcdb.Order) *order.Order {
 	return &order.Order{
 		ID:        order.ID(r.ID),
+		UserID:    r.UserID,
 		AmountJPY: r.AmountJpy,            // BIGINT → int64
 		Status:    order.Status(r.Status), // string → domain.Status
 		CreatedAt: r.CreatedAt,
@@ -20,6 +21,7 @@ func OrderToDomain(r sqlcdb.Order) *order.Order {
 func CreateOrderParamsFromDomain(o *order.Order) sqlcdb.CreateOrderParams {
 	return sqlcdb.CreateOrderParams{
 		ID:        string(o.ID),
+		UserID:    o.UserID,
 		AmountJpy: o.AmountJPY,
 		Status:    string(o.Status),
 		CreatedAt: o.CreatedAt,

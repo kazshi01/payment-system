@@ -61,7 +61,7 @@
 └── sqlc.yaml
 ```
 
-## API
+## DB, Keycloak, Server 起動
 
 - Docker Desktop を起動する
 
@@ -83,8 +83,10 @@ make keycloak.up
 go run cmd/api/main.go
 ```
 
-- OIDC認証をするため、ブラウザで下記ログインページにアクセスする
-- ログイン後に表示されるTOKENをコピーする
+## 決済
+
+- OIDC認証をするため、ブラウザで下記URLに登録ユーザーでログインする
+- Cookie に保存された access_token を取得する
 
 ```
 http://localhost:8080/auth/login
@@ -93,7 +95,7 @@ http://localhost:8080/auth/login
 - 注文を作成する
 
 ```
-TOKEN=<TOKEN>
+TOKEN=<access_token>
 
 curl -s -i -X POST http://localhost:8080/orders \
   -H "Authorization: Bearer $TOKEN" \
@@ -101,14 +103,14 @@ curl -s -i -X POST http://localhost:8080/orders \
   -d '{"amount_jpy":1200}'
 ```
 
-- 注文を支払う
+- 注文IDを取得して、注文を支払う
 
 ```
-curl -i -X POST "http://localhost:8080/orders/{id}/pay" \
+curl -i -X POST "http://localhost:8080/orders/<order_id>/pay" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-## 認証あり
+## M2M
 
 - Keycloak に管理者ログインして、 payment-api の SECRET を取得する
 
@@ -136,30 +138,39 @@ curl -i -X POST "http://localhost:8080/orders/$ORDER_ID/pay" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-- アクセストークンを更新する
+
+## アクセストークンを更新する
 
 ```
 curl -i -X POST http://localhost:8080/auth/refresh \
   -H 'Cookie: rt=<ブラウザから rt 取得>'
 ```
 
-- ログアウトする
+## ログアウト
 
 ```
 curl -i -X POST http://localhost:8080/auth/logout \
   -H 'Cookie: rt=<ブラウザから rt 取得>'
 ```
 
+※ ブラウザで`http://localhost:8080/auth/logout`を開いてもOK
+
 ## 削除
 
 - Keycloak を削除する
 
 ```
-make keycloak.down
+make keycloak.remove
 ```
 
 - DB を削除する
 
 ```
-make migrate.down
+make migrate.remove
+```
+
+- volume も削除する
+
+```
+make db.down
 ```

@@ -11,6 +11,7 @@ import (
 
 type Order struct {
 	ID        string
+	UserID    string
 	AmountJpy int64
 	Status    string
 	CreatedAt time.Time

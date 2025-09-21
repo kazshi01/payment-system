@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
 	"github.com/kazshi01/payment-system/internal/auth"
@@ -63,20 +62,21 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// CSRF 対策：state 照合
+	// CSRF: state
 	cState, _ := r.Cookie(cookieStateKey)
 	if cState == nil || cState.Value != state {
 		http.Error(w, "invalid state", http.StatusBadRequest)
 		return
 	}
 
-	// PKCE: code_verifier を添えてトークン交換
+	// PKCE: code_verifier
 	cVerifier, _ := r.Cookie(cookieVerifierKey)
 	if cVerifier == nil || cVerifier.Value == "" {
 		http.Error(w, "missing verifier", http.StatusBadRequest)
 		return
 	}
 
+	// トークン交換（PKCE）
 	tok, err := h.OIDC.Config.Exchange(ctx, code,
 		oauth2.SetAuthURLParam("code_verifier", cVerifier.Value),
 	)
@@ -85,43 +85,53 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rt, _ := tok.Extra("refresh_token").(string)
-	if rt != "" {
+	// 一時Cookie（state / verifier）は使い終わったので削除
+	http.SetCookie(w, &http.Cookie{
+		Name:     cookieStateKey,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   0,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     cookieVerifierKey,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   0,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// access_token を可視Cookieに保存（本番は HttpOnly + BFF推奨）
+	ttl := int(time.Until(tok.Expiry).Seconds())
+	if ttl < 1 {
+		ttl = 60 // 最低1分は保持（学習用）
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "at",
+		Value:    tok.AccessToken, // ← ここは tok.AccessToken を使う
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   ttl,
+		// Secure: true, // 本番は true（HTTPS）
+	})
+
+	// refresh_token は HttpOnly で保存（Keycloakはローテーションあり）
+	if rt := tok.RefreshToken; rt != "" {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "rt",
 			Value:    rt,
 			Path:     "/",
 			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
-			MaxAge:   60 * 60, // 1h
+			MaxAge:   60 * 60, // 本番はIdP設定に合わせる／offline_accessならもっと長い
+			// Secure: true,
 		})
-
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Pragma", "no-cache")
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
 	}
 
-	// アクセストークンを検証 & クレームを読む（任意）
-	idTokenRaw, _ := tok.Extra("id_token").(string)
-	verifier := h.OIDC.Provider.Verifier(&oidc.Config{
-		ClientID: h.OIDC.Config.ClientID,
-	})
-	var claims map[string]any
-	if idTokenRaw != "" {
-		if idt, err := verifier.Verify(ctx, idTokenRaw); err == nil {
-			_ = idt.Claims(&claims)
-		}
-	}
-
-	resp := map[string]any{
-		"access_token": tok.AccessToken,
-		"expires_in":   int64(time.Until(tok.Expiry).Seconds()),
-		"token_type":   tok.TokenType,
-		"id_token":     idTokenRaw,
-		"claims":       claims,
-	}
-	WriteJSON(w, http.StatusCreated, resp)
+	// キャッシュさせない & リダイレクト
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func setTmpCookie(w http.ResponseWriter, name, val string, ttl time.Duration) {
@@ -181,41 +191,51 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /auth/logout
+// GET/POST /auth/logout
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+	// Cookie 取得
+	var rt string
+	if c, err := r.Cookie("rt"); err == nil {
+		rt = c.Value
 	}
 
-	// ログアウト時には refresh token を渡す
-	c, err := r.Cookie("rt")
-	if err != nil || c.Value == "" {
-		w.WriteHeader(http.StatusNoContent)
-		return
+	// Keycloak 側のセッションも終了（refresh_token がある場合のみ）
+	if rt != "" {
+		issuer := os.Getenv("OIDC_ISSUER")
+		logoutURL := issuer + "/protocol/openid-connect/logout"
+
+		form := url.Values{}
+		form.Set("client_id", h.OIDC.Config.ClientID)
+		form.Set("refresh_token", rt)
+
+		req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, logoutURL, strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if resp, err := http.DefaultClient.Do(req); err == nil && resp != nil {
+			_ = resp.Body.Close()
+		}
 	}
 
-	issuer := os.Getenv("OIDC_ISSUER")
-	logoutURL := issuer + "/protocol/openid-connect/logout"
-
-	form := url.Values{}
-	form.Set("client_id", h.OIDC.Config.ClientID)
-	form.Set("refresh_token", c.Value)
-
-	req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, logoutURL, strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if resp, err := http.DefaultClient.Do(req); err == nil && resp != nil {
-		_ = resp.Body.Close()
-	}
-
+	// ローカル Cookie を削除（at / rt 両方）
+	http.SetCookie(w, &http.Cookie{
+		Name:     "at",
+		Value:    "",
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   0,
+		// Secure: true, // 本番
+	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "rt",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		// Secure: true, // 本番は有効
-		MaxAge: 0, // delete
+		MaxAge:   0,
+		// Secure: true, // 本番
 	})
-	w.WriteHeader(http.StatusNoContent)
+
+	// キャッシュさせず、ログイン画面へ 303 リダイレクト
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	http.Redirect(w, r, "/auth/login", http.StatusSeeOther) // 303
 }

@@ -14,6 +14,7 @@ import (
 
 type orderJSON struct {
 	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
 	AmountJPY int64     `json:"amount_jpy"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
@@ -59,6 +60,7 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// JSON形式で返却するための処理
 	resp := orderJSON{
 		ID:        string(o.ID),
+		UserID:    o.UserID,
 		AmountJPY: o.AmountJPY,
 		Status:    string(o.Status),
 		CreatedAt: o.CreatedAt,

@@ -1,5 +1,6 @@
 CREATE TABLE orders (
   id         TEXT        PRIMARY KEY,
+  user_id    TEXT        NOT NULL,
   amount_jpy BIGINT      NOT NULL CHECK (amount_jpy > 0),
   status     TEXT        NOT NULL CHECK (status IN ('PENDING','PAID','CANCELED')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

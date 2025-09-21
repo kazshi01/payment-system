@@ -6,6 +6,14 @@ import (
 )
 
 func Home(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	fmt.Fprintln(w, "Logged in! You can now call the API. (This is /)")
+
+	at, err := r.Cookie("at")
+	if err != nil || at.Value == "" {
+		http.Redirect(w, r, "/auth/logout", http.StatusSeeOther)
+		return
+	}
+
+	fmt.Fprintf(w, "Logged in!")
 }

@@ -96,6 +96,7 @@ func main() {
 	mux.HandleFunc("GET /auth/login", authH.Login)
 	mux.HandleFunc("GET /auth/callback", authH.Callback)
 	mux.HandleFunc("POST /auth/refresh", authH.Refresh)
+	mux.HandleFunc("GET /auth/logout", authH.Logout)
 	mux.HandleFunc("POST /auth/logout", authH.Logout)
 
 	log.Println("Listening on :8080")

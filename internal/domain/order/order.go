@@ -13,6 +13,7 @@ const (
 
 type Order struct {
 	ID        ID
+	UserID    string
 	AmountJPY int64
 	Status    Status
 	CreatedAt time.Time

@@ -9,6 +9,7 @@ import (
 // DBのテーブルと1対1で対応
 type OrderRecord struct {
 	ID        string    `db:"id"`
+	UserID    string    `db:"user_id"`
 	AmountJPY int64     `db:"amount_jpy"`
 	Status    string    `db:"status"`
 	CreatedAt time.Time `db:"created_at"`
@@ -19,6 +20,7 @@ type OrderRecord struct {
 func (r OrderRecord) ToDomain() *order.Order {
 	return &order.Order{
 		ID:        order.ID(r.ID),
+		UserID:    r.UserID,
 		AmountJPY: r.AmountJPY,
 		Status:    order.Status(r.Status),
 		CreatedAt: r.CreatedAt,
@@ -30,6 +32,7 @@ func (r OrderRecord) ToDomain() *order.Order {
 func FromDomain(o *order.Order) OrderRecord {
 	return OrderRecord{
 		ID:        string(o.ID),
+		UserID:    o.UserID,
 		AmountJPY: o.AmountJPY,
 		Status:    string(o.Status),
 		CreatedAt: o.CreatedAt,

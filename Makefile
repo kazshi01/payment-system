@@ -1,14 +1,17 @@
 # Makefile
-.PHONY: migrate.up migrate.down keycloak.up keycloak.down
+.PHONY: migrate.up migrate.remove keycloak.up keycloak.remove db.down
 
 migrate.up:
 	./db/migrate.sh
 
-migrate.down:
+migrate.remove:
 	docker compose rm -sfv db
 
 keycloak.up:
 	docker compose up -d keycloak
 
-keycloak.down:
+keycloak.remove:
 	docker compose rm -sfv keycloak
+
+db.down:
+	docker compose down -v

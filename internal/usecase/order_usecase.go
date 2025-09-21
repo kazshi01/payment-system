@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/kazshi01/payment-system/internal/auth"
 	"github.com/kazshi01/payment-system/internal/domain"
 	"github.com/kazshi01/payment-system/internal/domain/order"
 )
@@ -33,8 +34,15 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, amountJPY int64) (*orde
 		return nil, domain.ErrInternal
 	}
 
+	// ログインユーザーIDを取得
+	userID, ok := auth.UserIDFrom(ctx)
+	if !ok || userID == "" {
+		return nil, domain.ErrUnauthorized
+	}
+
 	o := &order.Order{
 		ID:        order.ID(uc.IDGen.New()),
+		UserID:    userID,
 		AmountJPY: amountJPY,
 		Status:    order.StatusPending,
 		CreatedAt: uc.Clock.Now(),
@@ -55,11 +63,17 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, amountJPY int64) (*orde
 
 // 外部決済(PG)はTxの外で行い、DB反映はTxでまとめる
 func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
-	// 1) 注文取得（Tx外・3s）
+	// ログインユーザーIDを取得
+	userID, ok := auth.UserIDFrom(ctx)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	// ---- 注文取得は 3s ----
 	dbReadCtx, cancelRead := context.WithTimeout(ctx, 3*time.Second)
 	defer cancelRead()
 
-	o, err := uc.Repo.FindByID(dbReadCtx, id)
+	o, err := uc.Repo.FindByIDForUser(dbReadCtx, id, userID)
 	if err != nil {
 		return err
 	}
@@ -67,7 +81,6 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 		return domain.ErrConflict
 	}
 
-	//    - idempotencyKey を付ける（注文IDなど）
 	// ---- PG 呼び出しは 5s ----
 	pgCtx, cancelPG := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPG()
@@ -88,7 +101,7 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 
 	return uc.Tx.Do(dbCtx, func(dbCtx context.Context) error {
 		// 最新状態の軽い再確認
-		oo, err := uc.Repo.FindByID(dbCtx, id)
+		oo, err := uc.Repo.FindByIDForUser(dbCtx, id, userID)
 		if err != nil {
 			return err
 		}
@@ -104,7 +117,7 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 
 		oo.MarkPaid()
 		updatedAt := uc.Clock.Now()
-		rows, err := uc.Repo.UpdateStatusIfPending(dbCtx, oo.ID, order.StatusPaid, updatedAt)
+		rows, err := uc.Repo.UpdateStatusIfPendingForUser(dbCtx, oo.ID, userID, order.StatusPaid, updatedAt)
 		if err != nil {
 			return err
 		}

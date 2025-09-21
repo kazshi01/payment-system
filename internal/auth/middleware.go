@@ -13,6 +13,10 @@ type Config struct {
 	Audience string
 }
 
+type ctxKey string
+
+const ClaimsKey ctxKey = "claims"
+
 func Middleware(cfg Config) (func(http.Handler) http.Handler, error) {
 	provider, err := oidc.NewProvider(context.Background(), cfg.Issuer)
 	if err != nil {
@@ -33,11 +37,29 @@ func Middleware(cfg Config) (func(http.Handler) http.Handler, error) {
 			}
 			raw := strings.TrimPrefix(authz, "Bearer ")
 
-			if _, err := verifier.Verify(r.Context(), raw); err != nil {
+			idt, err := verifier.Verify(r.Context(), raw)
+			if err != nil {
 				http.Error(w, "invalid token", http.StatusUnauthorized)
 				return
 			}
-			next.ServeHTTP(w, r)
+
+			// claims を取り出して context に保存
+			var claims map[string]any
+			_ = idt.Claims(&claims)
+
+			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
+			next.ServeHTTP(w, r.WithContext(ctx))
+
 		})
 	}, nil
+}
+
+// 取り出しヘルパ
+func UserIDFrom(ctx context.Context) (string, bool) {
+	if m, ok := ctx.Value(ClaimsKey).(map[string]any); ok {
+		if s, ok := m["sub"].(string); ok {
+			return s, true
+		}
+	}
+	return "", false
 }
