@@ -80,7 +80,7 @@ make keycloak.up
 - サーバーを起動する
 
 ```
-go run cmd/api/main.go
+make dev
 ```
 
 ## 決済

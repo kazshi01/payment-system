@@ -1,5 +1,8 @@
 # Makefile
-.PHONY: migrate.up migrate.remove keycloak.up keycloak.remove db.down
+.PHONY: dev migrate.up migrate.remove keycloak.up keycloak.remove db.down
+
+dev:
+	go run cmd/api/main.go
 
 migrate.up:
 	./db/migrate.sh
