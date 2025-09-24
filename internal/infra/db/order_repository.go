@@ -49,6 +49,21 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, o *order.Order) er
 	return nil
 }
 
+// FindByID fetches an order by ID.
+func (r *PostgresOrderRepository) FindByID(ctx context.Context, id order.ID) (*order.Order, error) {
+	rec, err := r.getQ(ctx).GetOrder(ctx, string(id))
+	if err != nil {
+		return nil, fmt.Errorf("get order: %w", err)
+	}
+	return &order.Order{
+		ID:        order.ID(rec.ID),
+		AmountJPY: rec.AmountJpy,
+		Status:    order.Status(rec.Status),
+		CreatedAt: rec.CreatedAt,
+		UpdatedAt: rec.UpdatedAt,
+	}, nil
+}
+
 // FindByIDForUser fetches an order by ID and user ID.
 func (r *PostgresOrderRepository) FindByIDForUser(ctx context.Context, id order.ID, userID string) (*order.Order, error) {
 	rec, err := r.getQ(ctx).GetOrderForUser(ctx, sqlcdb.GetOrderForUserParams{
@@ -83,6 +98,24 @@ func (r *PostgresOrderRepository) Update(ctx context.Context, o *order.Order) er
 		return fmt.Errorf("update order: %w", err)
 	}
 	return nil
+}
+
+// UpdateStatusIfPending updates the status of an order to the given status if it is pending.
+func (r *PostgresOrderRepository) UpdateStatusIfPending(
+	ctx context.Context,
+	id order.ID,
+	newStatus order.Status,
+	updatedAt time.Time,
+) (int64, error) {
+	n, err := r.getQ(ctx).UpdateOrderStatusIfPending(ctx, sqlcdb.UpdateOrderStatusIfPendingParams{
+		ID:        string(id),
+		Status:    string(newStatus),
+		UpdatedAt: updatedAt,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("update status if pending: %w", err)
+	}
+	return n, nil
 }
 
 // UpdateStatusIfPendingForUser updates the status of an order to the given status if it is pending.

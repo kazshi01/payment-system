@@ -36,6 +36,33 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) error 
 	return err
 }
 
+const getOrder = `-- name: GetOrder :one
+SELECT id, amount_jpy, status, created_at, updated_at
+FROM orders
+WHERE id = $1
+`
+
+type GetOrderRow struct {
+	ID        string
+	AmountJpy int64
+	Status    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) GetOrder(ctx context.Context, id string) (GetOrderRow, error) {
+	row := q.db.QueryRowContext(ctx, getOrder, id)
+	var i GetOrderRow
+	err := row.Scan(
+		&i.ID,
+		&i.AmountJpy,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getOrderForUser = `-- name: GetOrderForUser :one
 SELECT id, user_id, amount_jpy, status, created_at, updated_at
 FROM orders
@@ -82,6 +109,26 @@ func (q *Queries) UpdateOrder(ctx context.Context, arg UpdateOrderParams) error 
 		arg.UpdatedAt,
 	)
 	return err
+}
+
+const updateOrderStatusIfPending = `-- name: UpdateOrderStatusIfPending :execrows
+UPDATE orders
+SET status = $2, updated_at = $3
+WHERE id = $1 AND status = 'PENDING'
+`
+
+type UpdateOrderStatusIfPendingParams struct {
+	ID        string
+	Status    string
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateOrderStatusIfPending(ctx context.Context, arg UpdateOrderStatusIfPendingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateOrderStatusIfPending, arg.ID, arg.Status, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateOrderStatusIfPendingForUser = `-- name: UpdateOrderStatusIfPendingForUser :execrows

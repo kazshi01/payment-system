@@ -63,17 +63,30 @@ func (uc *OrderUsecase) CreateOrder(ctx context.Context, amountJPY int64) (*orde
 
 // 外部決済(PG)はTxの外で行い、DB反映はTxでまとめる
 func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
-	// ログインユーザーIDを取得
-	userID, ok := auth.UserIDFrom(ctx)
-	if !ok || userID == "" {
-		return domain.ErrUnauthorized
+	isAdmin := auth.IsAdmin(ctx)
+
+	// 一般ユーザは userID 必須。管理者は不要
+	userID, _ := auth.UserIDFrom(ctx)
+	if !isAdmin {
+		if userID == "" {
+			return domain.ErrUnauthorized
+		}
 	}
 
 	// ---- 注文取得は 3s ----
 	dbReadCtx, cancelRead := context.WithTimeout(ctx, 3*time.Second)
 	defer cancelRead()
 
-	o, err := uc.Repo.FindByIDForUser(dbReadCtx, id, userID)
+	var (
+		o   *order.Order
+		err error
+	)
+
+	if isAdmin {
+		o, err = uc.Repo.FindByID(dbReadCtx, id)
+	} else {
+		o, err = uc.Repo.FindByIDForUser(dbReadCtx, id, userID)
+	}
 	if err != nil {
 		return err
 	}
@@ -100,30 +113,24 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 	defer cancelDB()
 
 	return uc.Tx.Do(dbCtx, func(dbCtx context.Context) error {
-		// 最新状態の軽い再確認
-		oo, err := uc.Repo.FindByIDForUser(dbCtx, id, userID)
-		if err != nil {
-			return err
-		}
-		if oo.Status != order.StatusPending {
-			return domain.ErrConflict
-		}
-
-		_ = txID // Todo
-		// 支払いレコードやイベントを保存
-		// 例:
-		// if err := uc.PaymentsRepo.Create(dbCtx, payment.Payment{...txID...}); err != nil { return err }
-		// if err := uc.PaymentEventsRepo.Append(dbCtx, ...); err != nil { return err }
-
-		oo.MarkPaid()
 		updatedAt := uc.Clock.Now()
-		rows, err := uc.Repo.UpdateStatusIfPendingForUser(dbCtx, oo.ID, userID, order.StatusPaid, updatedAt)
+
+		var rows int64
+
+		if isAdmin {
+			rows, err = uc.Repo.UpdateStatusIfPending(dbCtx, o.ID, order.StatusPaid, updatedAt)
+		} else {
+			rows, err = uc.Repo.UpdateStatusIfPendingForUser(dbCtx, o.ID, userID, order.StatusPaid, updatedAt)
+		}
 		if err != nil {
 			return err
 		}
 		if rows == 0 {
 			return domain.ErrConflict
 		}
+
+		_ = txID // 将来 payments / events で利用
+
 		return nil
 	})
 }

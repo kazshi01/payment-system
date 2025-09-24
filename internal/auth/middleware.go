@@ -63,3 +63,28 @@ func UserIDFrom(ctx context.Context) (string, bool) {
 	}
 	return "", false
 }
+
+func HasRealmRole(ctx context.Context, role string) bool {
+	m, ok := ctx.Value(ClaimsKey).(map[string]any)
+	if !ok {
+		return false
+	}
+	ra, ok := m["realm_access"].(map[string]any)
+	if !ok {
+		return false
+	}
+	roles, ok := ra["roles"].([]any)
+	if !ok {
+		return false
+	}
+	for _, v := range roles {
+		if s, ok := v.(string); ok && s == role {
+			return true
+		}
+	}
+	return false
+}
+
+func IsAdmin(ctx context.Context) bool {
+	return HasRealmRole(ctx, "payment_admin")
+}
