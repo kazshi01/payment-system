@@ -14,6 +14,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/kazshi01/payment-system/internal/auth"
+	"github.com/kazshi01/payment-system/internal/docs"
 	"github.com/kazshi01/payment-system/internal/infra/clock"
 	"github.com/kazshi01/payment-system/internal/infra/db"
 	"github.com/kazshi01/payment-system/internal/infra/db/pg"
@@ -131,6 +132,17 @@ func main() {
 	mux.HandleFunc("POST /auth/refresh", authH.Refresh)
 	mux.HandleFunc("GET /auth/logout", authH.Logout)
 	mux.HandleFunc("POST /auth/logout", authH.Logout)
+
+	// Swagger UI
+	mux.HandleFunc("GET /openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		http.ServeFile(w, r, "cmd/api/openapi.yaml")
+	})
+
+	mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(docs.SwaggerHTML))
+	})
 
 	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))

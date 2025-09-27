@@ -6,7 +6,8 @@
 .
 ├── cmd
 │   └── api
-│       └── main.go
+│       ├── main.go
+│       └── openapi.yaml
 ├── db
 │   ├── migrate.sh
 │   ├── migrations
@@ -20,6 +21,8 @@
 │   ├── auth
 │   │   ├── middleware.go
 │   │   └── oidc-pkce.go
+│   ├── docs
+│   │   └── swagger.go
 │   ├── domain
 │   │   ├── errors.go
 │   │   ├── locker.go
@@ -60,6 +63,7 @@
 ├── kc-data
 │   └── data
 │       └── h2
+│           ├── keycloakdb.lock.db
 │           ├── keycloakdb.mv.db
 │           └── keycloakdb.trace.db
 ├── Makefile
@@ -68,7 +72,7 @@
 └── sqlc.yaml
 ```
 
-## DB, Keycloak, Server 起動
+## DB、Redis、Keycloak、Go Server 起動
 
 - Docker Desktop を起動する
 
@@ -105,6 +109,8 @@ make dev
 http://localhost:8080/auth/login
 ```
 
+### terminal で実行
+
 - 注文を作成する
 
 ```
@@ -122,6 +128,28 @@ curl -s -i -X POST http://localhost:8080/orders \
 curl -i -X POST "http://localhost:8080/orders/<order_id>/pay" \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+### Swagger UI
+
+- ブラウザで下記にアクセスする
+
+```
+http://localhost:8080/docs
+```
+- 注文を作成する（Create order）
+
+```
+Authorize ボタンをクリックして、ブラウザから取得した access_token を登録する
+Try it out ボタンをクリックして、任意の amount_jpy を入力して、Execute ボタンをクリックする
+```
+
+- 注文を支払う（Pay order）
+
+```
+Try it out ボタンをクリックして、注文 id を入力して、Execute ボタンをクリックする
+```
+
+- 
 
 ## M2M
 
