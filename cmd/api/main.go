@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -69,6 +70,17 @@ func main() {
 	}
 
 	locker := redislocker.New(raddr, rpass, rdb)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := locker.Ping(ctx); err != nil {
+		log.Fatalf("redis ping failed (addr=%s db=%d): %v", raddr, rdb, err)
+	}
+	defer func() {
+		if err := locker.Close(); err != nil {
+			log.Printf("warn: redis close: %v", err)
+		}
+	}()
 
 	log.Println("Redis connected")
 

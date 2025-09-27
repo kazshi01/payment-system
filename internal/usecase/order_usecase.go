@@ -9,7 +9,10 @@ import (
 	"github.com/kazshi01/payment-system/internal/domain/order"
 )
 
-const CurrencyJPY = "jpy"
+const (
+	CurrencyJPY = "jpy"
+	lockTTL     = 15
+)
 
 type Clock interface{ Now() time.Time }
 type IDGen interface{ New() string }
@@ -76,7 +79,7 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 
 	// 入口ガード（同時実行を1本化）
 	lockKey := "lock:pay:" + string(id)
-	const lockTTL = 30 // 秒（PG 5s + DB 3s にバッファ）
+
 	ok, token, err := uc.Locker.TryLock(ctx, lockKey, lockTTL)
 	if err != nil {
 		return err
@@ -84,7 +87,12 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 	if !ok {
 		return domain.ErrConflict
 	}
-	defer func() { _ = uc.Locker.Unlock(context.Background(), lockKey, token) }()
+
+	defer func() {
+		uctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		_ = uc.Locker.Unlock(uctx, lockKey, token)
+	}()
 
 	// ---- 注文取得は 3s ----
 	dbReadCtx, cancelRead := context.WithTimeout(ctx, 3*time.Second)

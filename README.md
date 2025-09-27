@@ -3,6 +3,7 @@
 ## ディレクトリ構成
 
 ```
+.
 ├── cmd
 │   └── api
 │       └── main.go
@@ -13,12 +14,15 @@
 │   │   └── 0001_init.up.sql
 │   └── order_record.go
 ├── docker-compose.yaml
+├── go.mod
+├── go.sum
 ├── internal
 │   ├── auth
 │   │   ├── middleware.go
 │   │   └── oidc-pkce.go
 │   ├── domain
 │   │   ├── errors.go
+│   │   ├── locker.go
 │   │   ├── order
 │   │   │   └── order.go
 │   │   ├── payment
@@ -41,11 +45,14 @@
 │   │   │   │   └── queries
 │   │   │   │       └── order.sql
 │   │   │   └── tx.go
-│   │   └── idgen
-│   │       └── uuidgen.go
+│   │   ├── idgen
+│   │   │   └── uuidgen.go
+│   │   └── redislocker
+│   │       └── locker.go
 │   ├── interface
 │   │   └── httpi
 │   │       ├── auth_handler.go
+│   │       ├── home.go
 │   │       ├── order_handler.go
 │   │       └── respond.go
 │   └── usecase
@@ -69,6 +76,12 @@
 
 ```
 make migrate.up
+```
+
+- Redis を起動する
+
+```
+make redis.up
 ```
 
 - Keycloak を起動する
@@ -160,17 +173,23 @@ curl -i -X POST http://localhost:8080/auth/logout \
 - Keycloak を削除する
 
 ```
-make keycloak.remove
+make keycloak.down
+```
+
+- Redis を削除する
+
+```
+make redis.down
 ```
 
 - DB を削除する
 
 ```
-make migrate.remove
+make migrate.down
 ```
 
 - volume も削除する
 
 ```
-make db.down
+make db.remove
 ```

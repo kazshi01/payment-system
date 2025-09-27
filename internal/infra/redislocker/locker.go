@@ -53,3 +53,11 @@ func (l *Locker) Unlock(ctx context.Context, key, token string) error {
 	_, err := luaUnlock.Run(ctx, l.cli, []string{key}, token).Result()
 	return err
 }
+
+func (l *Locker) Ping(ctx context.Context) error {
+	return l.cli.Ping(ctx).Err()
+}
+
+func (l *Locker) Close() error {
+	return l.cli.Close()
+}
