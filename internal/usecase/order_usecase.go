@@ -19,8 +19,9 @@ type OrderUsecase struct {
 	Tx   domain.Tx
 	PG   domain.PaymentGateway
 
-	Clock Clock
-	IDGen IDGen
+	Clock  Clock
+	IDGen  IDGen
+	Locker domain.Locker
 }
 
 // --- Create ---
@@ -73,13 +74,24 @@ func (uc *OrderUsecase) PayOrder(ctx context.Context, id order.ID) error {
 		}
 	}
 
+	// 入口ガード（同時実行を1本化）
+	lockKey := "lock:pay:" + string(id)
+	const lockTTL = 30 // 秒（PG 5s + DB 3s にバッファ）
+	ok, token, err := uc.Locker.TryLock(ctx, lockKey, lockTTL)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return domain.ErrConflict
+	}
+	defer func() { _ = uc.Locker.Unlock(context.Background(), lockKey, token) }()
+
 	// ---- 注文取得は 3s ----
 	dbReadCtx, cancelRead := context.WithTimeout(ctx, 3*time.Second)
 	defer cancelRead()
 
 	var (
-		o   *order.Order
-		err error
+		o *order.Order
 	)
 
 	if isAdmin {

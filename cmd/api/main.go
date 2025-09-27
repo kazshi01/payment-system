@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -16,6 +17,7 @@ import (
 	"github.com/kazshi01/payment-system/internal/infra/db"
 	"github.com/kazshi01/payment-system/internal/infra/db/pg"
 	"github.com/kazshi01/payment-system/internal/infra/idgen"
+	"github.com/kazshi01/payment-system/internal/infra/redislocker"
 	"github.com/kazshi01/payment-system/internal/interface/httpi"
 	"github.com/kazshi01/payment-system/internal/usecase"
 )
@@ -52,6 +54,24 @@ func main() {
 
 	log.Println("DB connected")
 
+	// Redis
+	raddr := os.Getenv("REDIS_ADDR")
+	rpass := os.Getenv("REDIS_PASSWORD")
+	rdbStr := os.Getenv("REDIS_DB")
+
+	rdb := 0
+	if rdbStr != "" {
+		i, err := strconv.Atoi(rdbStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		rdb = i
+	}
+
+	locker := redislocker.New(raddr, rpass, rdb)
+
+	log.Println("Redis connected")
+
 	// --- Repository & Tx ---
 	repo := db.NewPostgresOrderRepository(sqlDB)
 	txMgr := &db.TxManager{DB: sqlDB}
@@ -61,11 +81,12 @@ func main() {
 
 	// --- Usecase ---
 	orderUC := &usecase.OrderUsecase{
-		Repo:  repo,
-		Tx:    txMgr,
-		PG:    gateway,
-		Clock: clock.System{},
-		IDGen: idgen.UUIDGen{},
+		Repo:   repo,
+		Tx:     txMgr,
+		PG:     gateway,
+		Clock:  clock.System{},
+		IDGen:  idgen.UUIDGen{},
+		Locker: locker,
 	}
 
 	// --- OrderHandler ---

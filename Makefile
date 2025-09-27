@@ -1,5 +1,5 @@
 # Makefile
-.PHONY: dev migrate.up migrate.remove keycloak.up keycloak.remove db.down
+.PHONY: dev migrate.up migrate.down keycloak.up keycloak.down redis.up redis.down db.remove
 
 dev:
 	go run cmd/api/main.go
@@ -7,14 +7,20 @@ dev:
 migrate.up:
 	./db/migrate.sh
 
-migrate.remove:
+migrate.down:
 	docker compose rm -sfv db
 
 keycloak.up:
 	docker compose up -d keycloak
 
-keycloak.remove:
+keycloak.down:
 	docker compose rm -sfv keycloak
 
-db.down:
+redis.up:
+	docker compose up -d redis
+
+redis.down:
+	docker compose rm -sfv redis
+
+db.remove:
 	docker compose down -v
