@@ -59,18 +59,71 @@
 │   │       ├── order_handler.go
 │   │       └── respond.go
 │   └── usecase
+│       ├── order_usecase_test.go
 │       └── order_usecase.go
 ├── kc-data
 │   └── data
 │       └── h2
-│           ├── keycloakdb.lock.db
 │           ├── keycloakdb.mv.db
 │           └── keycloakdb.trace.db
 ├── Makefile
 ├── pkg
 ├── README.md
 └── sqlc.yaml
+
 ```
+
+## テスト実行
+
+```
+make test
+```
+<details>
+<summary>実行結果</summary>
+
+```
+% make test
+EMPTY internal/docs
+EMPTY internal/domain
+EMPTY internal/domain/payment
+        github.com/kazshi01/payment-system/internal/infra/clock         coverage: 0.0% of statements
+EMPTY internal/infra/clock (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/auth                coverage: 0.0% of statements
+EMPTY internal/auth (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/infra/db/sqlc               coverage: 0.0% of statements
+EMPTY internal/infra/db/sqlc (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/infra/db            coverage: 0.0% of statements
+EMPTY internal/infra/db (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/infra/db/pg         coverage: 0.0% of statements
+        github.com/kazshi01/payment-system/cmd/api              coverage: 0.0% of statements
+EMPTY internal/infra/db/pg (coverage: 0.0% of statements)
+EMPTY cmd/api (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/infra/idgen         coverage: 0.0% of statements
+EMPTY internal/infra/idgen (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/infra/db/dbmodel            coverage: 0.0% of statements
+EMPTY internal/infra/db/dbmodel (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/db           coverage: 0.0% of statements
+EMPTY db (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/domain/order                coverage: 0.0% of statements
+EMPTY internal/domain/order (coverage: 0.0% of statements)
+PASS internal/usecase.TestOrderUsecase_CreateOrder_ok (0.00s)
+PASS internal/usecase.TestOrderUsecase_PayOrder_ok (0.00s)
+PASS internal/usecase.TestOrderUsecase_CreateOrder_invalidAmount (0.00s)
+PASS internal/usecase.TestOrderUsecase_PayOrder_notFound (0.00s)
+PASS internal/usecase.TestOrderUsecase_PayOrder_wrongUser (0.00s)
+PASS internal/usecase.TestOrderUsecase_PayOrder_alreadyPaid (0.00s)
+coverage: 80.7% of statements
+PASS internal/usecase (cached) (coverage: 80.7% of statements)
+        github.com/kazshi01/payment-system/internal/infra/redislocker           coverage: 0.0% of statements
+EMPTY internal/infra/redislocker (coverage: 0.0% of statements)
+        github.com/kazshi01/payment-system/internal/interface/httpi             coverage: 0.0% of statements
+EMPTY internal/interface/httpi (coverage: 0.0% of statements)
+
+DONE 6 tests in 0.230s
+%
+```
+
+</details>
 
 ## DB、Redis、Keycloak、Go Server 起動
 
