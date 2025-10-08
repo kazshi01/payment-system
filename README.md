@@ -202,8 +202,6 @@ Try it out ボタンをクリックして、任意の amount_jpy を入力して
 Try it out ボタンをクリックして、注文 id を入力して、Execute ボタンをクリックする
 ```
 
-- 
-
 ## M2M
 
 - Keycloak に管理者ログインして、 payment-api の SECRET を取得する
