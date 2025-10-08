@@ -1,5 +1,5 @@
 # Makefile
-.PHONY: dev migrate.up migrate.down keycloak.up keycloak.down redis.up redis.down db.remove
+.PHONY: dev migrate.up migrate.down keycloak.up keycloak.down redis.up redis.down db.remove test
 
 dev:
 	@go run cmd/api/main.go
